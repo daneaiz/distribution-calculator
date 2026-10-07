@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Distribution Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #E9EEEC;
+    --surface: #F7F9F8;
+    --ink: #1C2826;
+    --muted: #5F6E6B;
+    --line: #C9D3D0;
+    --accent: #2E5B4F;
+    --accent-ink: #F7F9F8;
+    --off: #A9B5B2;
+    --error: #A33232;
+    --error-bg: #F6E3E1;
+    --ok-bg: #DCE9E4;
+    --seg-1: #2E5B4F; --seg-2: #5C8A7C; --seg-3: #3E5F7A; --seg-4: #7A8F5A;
+    --seg-5: #6B5A7A; --seg-6: #8A6E4B; --seg-7: #4A7A82; --seg-8: #7A4F5A;
+    --serif: "Literata", Georgia, "Times New Roman", serif;
+    --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --r: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141B1A; --surface: #1C2524; --ink: #E3EAE8; --muted: #94A4A0;
+      --line: #33403E; --accent: #7FB3A3; --accent-ink: #10201B; --off: #4A5856;
+      --error: #E68A80; --error-bg: #3A2221; --ok-bg: #1F3330;
+      --seg-1: #5E9C8A; --seg-2: #88B5A7; --seg-3: #6E93B3; --seg-4: #A3B87F;
+      --seg-5: #9D88B3; --seg-6: #BF9C70; --seg-7: #73AAB3; --seg-8: #B37D8A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141B1A; --surface: #1C2524; --ink: #E3EAE8; --muted: #94A4A0;
+    --line: #33403E; --accent: #7FB3A3; --accent-ink: #10201B; --off: #4A5856;
+    --error: #E68A80; --error-bg: #3A2221; --ok-bg: #1F3330;
+    --seg-1: #5E9C8A; --seg-2: #88B5A7; --seg-3: #6E93B3; --seg-4: #A3B87F;
+    --seg-5: #9D88B3; --seg-6: #BF9C70; --seg-7: #73AAB3; --seg-8: #B37D8A;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 64px; }
+
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: 1.75rem;
+    line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em;
+  }
+  .lede { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+
+  /* Total amount */
+  .amount { display: block; margin-bottom: 28px; }
+  .amount span { display: block; font-weight: 500; margin-bottom: 6px; }
+  .amount-field { position: relative; }
+  .amount input {
+    width: 100%; font-family: var(--serif); font-size: 2.25rem; font-weight: 600;
+    line-height: 1.2; color: var(--ink); background: var(--surface);
+    border: 1.5px solid var(--line); border-radius: var(--r);
+    padding: 10px 52px 10px 14px; font-variant-numeric: tabular-nums;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .amount input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .amount-edit {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px; color: var(--muted); pointer-events: none;
+  }
+  .amount input:focus + .amount-edit { color: var(--accent); }
+  @media (hover: hover) {
+    .amount input:not(:focus):hover { border-color: var(--muted); }
+  }
+
+  /* Distribution bar — the one memorable element */
+  .bar {
+    display: flex; height: 56px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;
+  }
+  .seg {
+    position: relative; height: 100%; min-width: 0; overflow: hidden;
+    transition: width 480ms cubic-bezier(.65,0,.25,1);
+    color: #fff; display: flex; align-items: center; padding: 0;
+    font-size: 0.8125rem; font-weight: 600; white-space: nowrap;
+  }
+  .seg + .seg { box-shadow: inset 1px 0 0 rgba(255,255,255,.35); }
+  .seg .seg-label { overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+  .seg .seg-label:empty { display: none; }
+  .bar-note { color: var(--muted); font-size: 0.875rem; margin: 8px 0 0; min-height: 1.5em; }
+
+  /* Status */
+  .status {
+    margin: 24px 0 12px; padding: 10px 14px; border-radius: var(--r);
+    font-size: 0.9375rem; font-weight: 500;
+  }
+  .status.ok { background: var(--ok-bg); color: var(--accent); }
+  .status.bad { background: var(--error-bg); color: var(--error); }
+
+  /* People list */
+  .people { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .person {
+    display: grid; align-items: center; gap: 12px 16px;
+    grid-template-columns: 112px minmax(0,1fr) 108px 210px 36px;
+    grid-template-areas: "toggle name pct result remove";
+    padding: 14px 0; background: var(--bg); position: relative;
+  }
+  .swipe { position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
+  .swipe-del { display: none; }
+  .swipe-hint { display: none; }
+  .person .swatch-wrap { grid-area: toggle; display: flex; align-items: center; gap: 12px; }
+  .swatch { width: 4px; height: 36px; border-radius: 2px; order: -1; flex: none; }
+  .is-off .swatch { background: var(--off) !important; }
+
+  .name {
+    grid-area: name; width: 100%; font: inherit; font-size: 16px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 8px 10px;
+  }
+  .pct-wrap { grid-area: pct; position: relative; }
+  .pct {
+    width: 100%; font: inherit; font-size: 16px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 8px 28px 8px 10px; text-align: right; font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+  }
+  .pct::-webkit-outer-spin-button, .pct::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .pct-wrap::after {
+    content: "%"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none;
+  }
+  .name:focus, .pct:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
+  .result { grid-area: result; text-align: right; font-variant-numeric: tabular-nums; }
+  .result .amt { font-family: var(--serif); font-weight: 600; font-size: 1.125rem; display: block; }
+  .result .detail { font-size: 0.8125rem; color: var(--muted); display: block; }
+  .is-off .name, .is-off .pct { color: var(--muted); }
+  .is-off .result .amt { color: var(--muted); text-decoration: line-through; font-weight: 400; }
+
+  /* Include / exclude button */
+  .toggle {
+    flex: none; width: 96px; height: 42px; cursor: pointer;
+    font: inherit; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.01em;
+    border-radius: var(--r); padding: 0 8px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    background: var(--ok-bg); color: var(--accent); border: 1px solid var(--accent);
+    transition: background 150ms, color 150ms, border-color 150ms;
+  }
+  .toggle svg { width: 14px; height: 14px; flex: none; }
+  .toggle[aria-pressed="false"] {
+    background: transparent; color: var(--muted); border-color: var(--line);
+  }
+  .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (hover: hover) {
+    .toggle[aria-pressed="true"]:hover { filter: brightness(0.97); }
+    .toggle[aria-pressed="false"]:hover { border-color: var(--muted); color: var(--ink); }
+  }
+
+  .remove {
+    grid-area: remove; width: 36px; height: 36px; border: 1px solid transparent;
+    background: transparent; color: var(--muted); border-radius: var(--r);
+    cursor: pointer; font-size: 1.25rem; line-height: 1;
+  }
+  .remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+
+  .actions { margin-top: 16px; }
+  .action-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .privacy {
+    display: flex; align-items: flex-start; gap: 6px; margin: 12px 0 0;
+    font-size: 0.8125rem; line-height: 1.4; color: var(--muted);
+  }
+  .privacy svg { flex: none; width: 14px; height: 14px; margin-top: 2px; }
+  .btn {
+    font: inherit; font-weight: 600; font-size: 0.9375rem; cursor: pointer;
+    border-radius: var(--r); padding: 10px 16px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink);
+  }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  #undo { margin-left: auto; }
+
+  .empty { color: var(--muted); padding: 20px 0; border-bottom: 1px solid var(--line); margin: 0; }
+
+  @media (hover: hover) {
+    .remove:hover { color: var(--error); border-color: var(--line); background: var(--surface); }
+    .btn:not(:disabled):hover { filter: brightness(1.08); }
+    .btn.ghost:not(:disabled):hover { background: var(--surface); filter: none; }
+  }
+
+  .bar-note:empty { display: none; }
+
+  @media (max-width: 600px) {
+    html {
+      scroll-padding-top: calc(env(safe-area-inset-top, 0px) + var(--sticky-top, 0px) + 8px);
+      scroll-padding-bottom: calc(var(--sticky-bottom, 0px) + 8px);
+    }
+    main { padding: 20px 16px 0; }
+
+    /* Type scale for small screens */
+    h1 { font-size: 1.375rem; margin-bottom: 4px; }
+    .lede { font-size: 0.9375rem; line-height: 1.45; margin-bottom: 16px; }
+
+    /* Sticky summary: total amount, split bar, status */
+    .summary {
+      position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+      margin: 0 -16px; padding: 10px 16px 12px;
+      background: var(--bg); border-bottom: 1px solid var(--line);
+    }
+    .amount { margin-bottom: 10px; }
+    .amount > span { font-size: 0.8125rem; color: var(--muted); margin-bottom: 4px; }
+    .amount input { font-size: 1.5rem; padding: 8px 44px 8px 12px; }
+    .amount-edit { right: 12px; width: 20px; height: 20px; }
+    .bar { height: 36px; }
+    .seg { font-size: 0.75rem; }
+    .seg .seg-label { padding: 0 8px; }
+    .bar-note { font-size: 0.8125rem; margin-top: 6px; min-height: 0; line-height: 1.35; }
+    .status { margin: 8px 0 0; padding: 6px 10px; font-size: 0.8125rem; }
+
+    /* Rows */
+    .people { border-top: 0; }
+    .person {
+      grid-template-columns: 4px minmax(0,1fr) 76px 96px;
+      grid-template-areas:
+        "swatch name pct toggle"
+        "swatch result result result";
+      gap: 10px 12px; padding: 12px 0;
+    }
+    .remove {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    .person { touch-action: pan-y; will-change: transform; }
+    .person.animating { transition: transform 220ms cubic-bezier(.3,.7,.3,1); }
+    .swipe.removing { transition: height 220ms ease, opacity 220ms ease; opacity: 0; }
+    .swipe-del {
+      display: flex; position: absolute; inset: 0 0 0 auto; width: 100%;
+      justify-content: flex-end; align-items: stretch; background: var(--error);
+    }
+    .swipe-del button {
+      width: 96px; border: 0; background: transparent; color: #fff; cursor: pointer;
+      font: inherit; font-size: 0.8125rem; font-weight: 600;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    }
+    .swipe-del svg { width: 20px; height: 20px; }
+    .swipe-hint {
+      display: flex; align-items: center; gap: 6px; margin: 10px 0 0;
+      font-size: 0.75rem; color: var(--muted);
+    }
+    .swipe-hint svg { width: 16px; height: 16px; flex: none; }
+    .swipe-hint[hidden] { display: none; }
+    .person .swatch-wrap { display: contents; }
+    .person .toggle { grid-area: toggle; }
+    .person .swatch { grid-area: swatch; height: auto; align-self: stretch; }
+    .pct-wrap { width: 100%; }
+    .pct { padding-left: 8px; }
+    .result {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      min-width: 0;
+    }
+    .result .amt { order: 2; flex: none; }
+    .result .detail { order: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result .amt { font-size: 1rem; }
+    .result .detail { font-size: 0.75rem; }
+
+    /* Sticky action bar */
+    .actions {
+      position: sticky; bottom: 0; z-index: 2;
+      margin: 16px -16px 0;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: var(--bg); border-top: 1px solid var(--line);
+    }
+    .action-row { flex-wrap: nowrap; gap: 8px; }
+    .privacy { margin-top: 8px; font-size: 0.75rem; justify-content: center; text-align: center; }
+    .actions .btn { flex: 1 1 0; min-height: 44px; padding: 8px 6px; font-size: 0.875rem; white-space: nowrap; }
+    #undo { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .seg, .toggle { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Distribution Calculator</h1>
+  <p class="lede">Divide an amount between people by percentage. Exclude someone and their share goes to everyone still included, in proportion to their own shares.</p>
+
+  <div class="summary" id="summary">
+  <label class="amount">
+    <span>Total amount</span>
+    <div class="amount-field">
+      <input id="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="barNote">
+      <svg class="amount-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>
+    </div>
+  </label>
+
+  <div class="bar" id="bar" role="img" aria-label="How the total is split"></div>
+  <p class="bar-note" id="barNote"></p>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <p class="swipe-hint" id="swipeHint" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    <span>Swipe left on a person to delete them</span>
+  </p>
+  <ul class="people" id="people"></ul>
+
+  <div class="actions" id="actions">
+    <div class="action-row">
+    <button class="btn" id="add" type="button">Add person</button>
+    <button class="btn ghost" id="even" type="button">Split evenly</button>
+    <button class="btn ghost" id="undo" type="button" disabled>Undo</button>
+    </div>
+    <p class="privacy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>Your entries are saved only in this browser. Nothing is sent or stored anywhere else.</span>
+    </p>
+  </div>
+</main>
+
+<script>
+(function () {
+  const KEY = "distribution-calculator-v1";
+  const OLD_KEYS = ["inheritance-split-v1"];
+  const SEG_COUNT = 8;
+  let uid = 0;
+  const newId = () => "p" + Date.now().toString(36) + (uid++);
+
+  let state = {
+    amount: 300000,
+    people: [
+      { id: newId(), name: "Alex", pct: 50, on: true },
+      { id: newId(), name: "Sam", pct: 30, on: true },
+      { id: newId(), name: "Jordan", pct: 20, on: true }
+    ]
+  };
+
+  try {
+    let raw = localStorage.getItem(KEY);
+    if (raw === null) {
+      const old = OLD_KEYS.find(k => localStorage.getItem(k) !== null);
+      if (old) { raw = localStorage.getItem(old); }
+    }
+    const saved = JSON.parse(raw || "null");
+    if (saved && saved.amount === undefined && saved.estate !== undefined) { saved.amount = saved.estate; delete saved.estate; }
+    if (saved && Array.isArray(saved.people)) state = saved;
+  } catch (e) {}
+
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); OLD_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {}
+  };
+
+  // Undo history: snapshots taken before each change.
+  const history = [];
+  const HISTORY_MAX = 50;
+  let typingSnapshotTaken = false; // one snapshot per focus session in a text field
+  function remember() {
+    history.push(JSON.stringify(state));
+    if (history.length > HISTORY_MAX) history.shift();
+    syncUndo();
+  }
+  function rememberTyping() {
+    if (!typingSnapshotTaken) { remember(); typingSnapshotTaken = true; }
+  }
+  function syncUndo() { const b = document.getElementById("undo"); if (b) b.disabled = history.length === 0; }
+
+  const $ = (id) => document.getElementById(id);
+  const amountEl = $("amount"), listEl = $("people"), barEl = $("bar"),
+        statusEl = $("status"), noteEl = $("barNote");
+
+  const fmtMoney = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (n) => (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const parseNum = (s) => { const n = parseFloat(String(s).replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
+  const segColor = (i) => `var(--seg-${(i % SEG_COUNT) + 1})`;
+
+  // Exact split in cents using largest remainder, so amounts always add up to the total.
+  function compute() {
+    const total = state.people.reduce((s, p) => s + (p.pct || 0), 0);
+    const balanced = Math.abs(total - 100) < 0.005;
+    const active = state.people.filter(p => p.on && p.pct > 0);
+    const activePct = active.reduce((s, p) => s + p.pct, 0);
+    const cents = Math.round(Math.max(0, state.amount) * 100);
+    const out = {};
+    state.people.forEach(p => out[p.id] = { eff: 0, cents: 0, baseCents: 0 });
+    if (activePct > 0) {
+      let rows = active.map(p => {
+        const raw = cents * p.pct / activePct;
+        return { id: p.id, floor: Math.floor(raw), frac: raw - Math.floor(raw) };
+      });
+      let left = cents - rows.reduce((s, r) => s + r.floor, 0);
+      rows.slice().sort((a, b) => b.frac - a.frac).forEach(r => { if (left > 0) { r.floor++; left--; } });
+      rows.forEach(r => {
+        const p = state.people.find(x => x.id === r.id);
+        out[r.id].cents = r.floor;
+        out[r.id].eff = p.pct / activePct * 100;
+      });
+    }
+    state.people.forEach(p => { out[p.id].baseCents = Math.round(cents * (p.pct || 0) / 100); });
+    return { total, balanced, activePct, activeCount: active.length, out };
+  }
+
+  function renderList() {
+    listEl.innerHTML = "";
+    if (!state.people.length) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "No one added yet. Add a person to start the split.";
+      listEl.appendChild(li);
+    }
+    state.people.forEach((p, i) => {
+      const li = document.createElement("li");
+      li.className = "swipe";
+      li.dataset.id = p.id;
+      li.innerHTML = `
+        <div class="swipe-del" aria-hidden="true"><button type="button" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>Delete</button></div>
+        <div class="person">
+        <div class="swatch-wrap">
+          <button class="toggle" type="button"></button>
+          <span class="swatch" aria-hidden="true"></span>
+        </div>
+        <input class="name" type="text" autocomplete="off">
+        <div class="pct-wrap"><input class="pct" type="number" inputmode="decimal" min="0" max="100" step="0.01"></div>
+        <div class="result"><span class="amt"></span><span class="detail"></span></div>
+        <button class="remove" type="button">×</button>
+        </div>`;
+      const name = li.querySelector(".name"), pct = li.querySelector(".pct"),
+            tog = li.querySelector(".toggle"), rm = li.querySelector(".remove");
+      li.querySelector(".swatch").style.background = segColor(i);
+      name.value = p.name; name.placeholder = "Name";
+      name.setAttribute("aria-label", "Name of person " + (i + 1));
+      pct.value = p.pct; pct.setAttribute("aria-label", "Share for " + (p.name || "person " + (i + 1)));
+      rm.setAttribute("aria-label", "Remove " + (p.name || "person " + (i + 1)));
+
+      [name, pct].forEach(el => el.addEventListener("focus", () => { typingSnapshotTaken = false; }));
+      name.addEventListener("input", () => { rememberTyping(); p.name = name.value; update(); });
+      pct.addEventListener("input", () => { rememberTyping(); p.pct = Math.max(0, parseNum(pct.value)); update(); });
+      tog.addEventListener("click", () => { remember(); p.on = !p.on; update(); });
+      const removePerson = () => {
+        remember();
+        state.people = state.people.filter(x => x.id !== p.id);
+        renderList(); update(); renderBar(true);
+      };
+      rm.addEventListener("click", removePerson);
+      li.querySelector(".swipe-del button").addEventListener("click", () => collapseThen(li, removePerson));
+      attachSwipe(li, removePerson);
+      listEl.appendChild(li);
+    });
+    renderBar(true);
+  }
+
+  // ---- Swipe to delete (phones only) ----
+  const mobileMQ = window.matchMedia("(max-width: 600px)");
+  const HINT_KEY = "distribution-calculator-swipe-hint-seen";
+  try {
+    if (localStorage.getItem("fair-share-swipe-hint-seen") === "1") {
+      localStorage.setItem(HINT_KEY, "1"); localStorage.removeItem("fair-share-swipe-hint-seen");
+    }
+  } catch (e) {}
+  const REVEAL = 96;
+  let openRow = null;
+  const hintEl = document.getElementById("swipeHint");
+  const hintSeen = () => { try { return localStorage.getItem(HINT_KEY) === "1"; } catch (e) { return false; } };
+  function markHintSeen() {
+    try { localStorage.setItem(HINT_KEY, "1"); } catch (e) {}
+    hintEl.hidden = true;
+  }
+  function syncHint() { hintEl.hidden = !(mobileMQ.matches && state.people.length && !hintSeen()); }
+
+  function setX(row, x, animate) {
+    const card = row.querySelector(".person");
+    card.classList.toggle("animating", !!animate);
+    card.style.transform = x ? `translateX(${x}px)` : "";
+    row._x = x;
+  }
+  function closeRow(row) { if (row) setX(row, 0, true); if (openRow === row) openRow = null; }
+  function collapseThen(row, done) {
+    const h = row.offsetHeight;
+    row.style.height = h + "px";
+    setX(row, -row.offsetWidth, true);
+    requestAnimationFrame(() => { row.classList.add("removing"); row.style.height = "0px"; });
+    setTimeout(done, 230);
+  }
+
+  function attachSwipe(row, onDelete) {
+    const card = row.querySelector(".person");
+    let startX = 0, startY = 0, base = 0, dragging = false, decided = false, suppressClick = false, pid = null;
+    card.addEventListener("pointerdown", (e) => {
+      if (!mobileMQ.matches || e.pointerType === "mouse") return;
+      if (openRow && openRow !== row) closeRow(openRow);
+      startX = e.clientX; startY = e.clientY; base = row._x || 0;
+      dragging = false; decided = false; pid = e.pointerId;
+    });
+    card.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== pid || !mobileMQ.matches) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        decided = true;
+        dragging = Math.abs(dx) > Math.abs(dy);
+        if (dragging) { try { card.setPointerCapture(pid); } catch (err) {} if (document.activeElement && card.contains(document.activeElement)) document.activeElement.blur(); }
+      }
+      if (!dragging) return;
+      const w = row.offsetWidth;
+      setX(row, Math.max(-w, Math.min(0, base + dx)), false);
+    });
+    const end = (e) => {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      if (!dragging) {
+        if (base !== 0) { closeRow(row); suppressClick = true; }
+        return;
+      }
+      dragging = false; suppressClick = true;
+      const x = row._x || 0, w = row.offsetWidth;
+      if (x < -w * 0.55) { markHintSeen(); collapseThen(row, onDelete); }
+      else if (x < -REVEAL / 2) { setX(row, -REVEAL, true); openRow = row; markHintSeen(); }
+      else closeRow(row);
+    };
+    card.addEventListener("pointerup", end);
+    card.addEventListener("pointercancel", end);
+    card.addEventListener("click", (e) => {
+      if (suppressClick) { e.preventDefault(); e.stopPropagation(); suppressClick = false; }
+    }, true);
+  }
+  document.addEventListener("pointerdown", (e) => {
+    if (openRow && !openRow.contains(e.target)) closeRow(openRow);
+  });
+  mobileMQ.addEventListener("change", () => { if (!mobileMQ.matches && openRow) closeRow(openRow); syncHint(); });
+
+  // One-time nudge so people discover the gesture
+  function nudge() {
+    if (!mobileMQ.matches || hintSeen() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const row = listEl.querySelector(".swipe");
+    if (!row) return;
+    setX(row, -56, true);
+    setTimeout(() => { if (row._x === -56) setX(row, 0, true); }, 650);
+  }
+
+  function renderBar(rebuild) {
+    if (rebuild) {
+      barEl.innerHTML = "";
+      state.people.forEach((p, i) => {
+        const s = document.createElement("div");
+        s.className = "seg"; s.dataset.id = p.id;
+        s.style.background = segColor(i); s.style.width = "0%";
+        s.innerHTML = '<span class="seg-label"></span>';
+        barEl.appendChild(s);
+      });
+    }
+  }
+
+  function update() {
+    const r = compute();
+
+    // Status line
+    const diff = Math.round((100 - r.total) * 100) / 100;
+    if (!state.people.length) {
+      statusEl.className = "status bad"; statusEl.textContent = "Add at least one person.";
+    } else if (!r.balanced) {
+      statusEl.className = "status bad";
+      statusEl.textContent = diff > 0
+        ? `Shares add up to ${fmtPct(r.total)}%. Assign another ${fmtPct(diff)}% to reach 100%.`
+        : `Shares add up to ${fmtPct(r.total)}%. Remove ${fmtPct(-diff)}% to get back to 100%.`;
+    } else if (r.activeCount === 0) {
+      statusEl.className = "status bad"; statusEl.textContent = "Everyone is excluded. Include at least one person.";
+    } else {
+      statusEl.className = "status ok"; statusEl.textContent = "Shares add up to 100%.";
+    }
+
+    const ready = r.balanced && r.activeCount > 0;
+    const offPeople = state.people.filter(p => !p.on && p.pct > 0);
+    const offPct = offPeople.reduce((s, p) => s + p.pct, 0);
+    noteEl.textContent = ready && offPeople.length
+      ? `${fmtPct(offPct)}% from ${offPeople.map(p => p.name || "unnamed").join(", ")} is passed on to the others.`
+      : "";
+
+    // Rows
+    state.people.forEach((p, i) => {
+      const li = listEl.querySelector(`[data-id="${p.id}"]`);
+      if (!li) return;
+      const o = r.out[p.id];
+      li.classList.toggle("is-off", !p.on);
+      const tog = li.querySelector(".toggle");
+      const who = p.name || "person " + (i + 1);
+      tog.setAttribute("aria-pressed", String(p.on));
+      tog.innerHTML = p.on
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Included'
+        : 'Excluded';
+      tog.setAttribute("aria-label", "Include " + who);
+      tog.title = p.on ? "Tap to exclude " + who : "Tap to include " + who;
+      const amt = li.querySelector(".amt"), det = li.querySelector(".detail");
+      if (!ready) {
+        amt.textContent = "—"; det.textContent = p.on ? "" : "Excluded";
+      } else if (!p.on) {
+        amt.textContent = fmtMoney(o.baseCents / 100); det.textContent = "Goes to the others";
+      } else {
+        amt.textContent = fmtMoney(o.cents / 100);
+        const extra = o.cents - o.baseCents;
+        det.textContent = extra > 0
+          ? `${fmtPct(o.eff)}%, incl. +${fmtMoney(extra / 100)}`
+          : `${fmtPct(o.eff)}%`;
+      }
+    });
+
+    // Bar
+    barEl.querySelectorAll(".seg").forEach(s => {
+      const p = state.people.find(x => x.id === s.dataset.id);
+      if (!p) return;
+      const w = ready ? r.out[p.id].eff : (p.on ? Math.max(0, p.pct) / Math.max(r.total, 100) * 100 : 0);
+      s.style.width = w + "%";
+      s.querySelector(".seg-label").textContent = w >= 9 ? (p.name || "—") + " " + fmtPct(w) + "%" : "";
+      s.title = (p.name || "Unnamed") + ": " + fmtPct(w) + "%";
+    });
+
+    syncHint();
+    save();
+  }
+
+  // Total amount input
+  amountEl.value = fmtMoney(state.amount);
+  amountEl.addEventListener("input", () => { rememberTyping(); state.amount = Math.max(0, parseNum(amountEl.value)); update(); });
+  amountEl.addEventListener("blur", () => { amountEl.value = fmtMoney(state.amount); });
+  amountEl.addEventListener("focus", () => { typingSnapshotTaken = false; amountEl.value = state.amount ? String(state.amount) : ""; });
+
+  function undo() {
+    if (!history.length) return;
+    state = JSON.parse(history.pop());
+    typingSnapshotTaken = false;
+    amountEl.value = document.activeElement === amountEl ? String(state.amount || "") : fmtMoney(state.amount);
+    renderList(); update(); syncUndo();
+  }
+  $("undo").addEventListener("click", undo);
+  // Ctrl/Cmd+Z undoes calculator changes when you're not typing in a field
+  document.addEventListener("keydown", (e) => {
+    const typing = e.target.matches && e.target.matches("input, textarea");
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !typing) {
+      e.preventDefault(); undo();
+    }
+  });
+
+  $("add").addEventListener("click", () => {
+    remember();
+    const remaining = Math.max(0, Math.round((100 - state.people.reduce((s, p) => s + (p.pct || 0), 0)) * 100) / 100);
+    state.people.push({ id: newId(), name: "", pct: remaining, on: true });
+    renderList(); update();
+    const last = listEl.querySelector(".swipe:last-child .name");
+    if (last) last.focus();
+  });
+
+  $("even").addEventListener("click", () => {
+    const n = state.people.length; if (!n) return;
+    remember();
+    const base = Math.floor(10000 / n) / 100;
+    let left = Math.round((100 - base * n) * 100);
+    state.people.forEach(p => { p.pct = base + (left-- > 0 ? 0.01 : 0); p.pct = Math.round(p.pct * 100) / 100; });
+    renderList(); update();
+  });
+
+  // Keep focused fields from hiding under the sticky bars on mobile
+  const rootStyle = document.documentElement.style;
+  const measure = () => {
+    rootStyle.setProperty("--sticky-top", $("summary").offsetHeight + "px");
+    rootStyle.setProperty("--sticky-bottom", $("actions").offsetHeight + "px");
+  };
+  if ("ResizeObserver" in window) {
+    const ro = new ResizeObserver(measure);
+    ro.observe($("summary")); ro.observe($("actions"));
+  }
+  window.addEventListener("resize", measure);
+
+  renderList();
+  requestAnimationFrame(() => { update(); measure(); });
+  setTimeout(nudge, 900);
+})();
+</script>
+</body>
+</html>
